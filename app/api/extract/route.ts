@@ -28,10 +28,23 @@ export async function POST(req: NextRequest) {
     // Code Pass: Apply deterministic flagging and canonical naming on any lab tests found
     const { flaggedTests, riskAlerts } = flagAllTests(extracted.tests);
 
+    // Code Pass: Detect urgent or abnormal radiographic findings (e.g., fractures, dislocations)
+    for (const rf of extracted.radiologyFindings || []) {
+      if (rf.isAbnormal || rf.severity === "urgent") {
+        riskAlerts.push({
+          title: `Radiology Alert: ${rf.bodyPart}`,
+          severity: rf.severity === "urgent" ? "urgent" : "warning",
+          riskDetail: rf.impression || rf.observation || "Abnormal radiographic finding observed.",
+          immediateAction:
+            "Seek prompt clinical evaluation from an orthopedic doctor or emergency physician.",
+        });
+      }
+    }
+
     const warnings = [...extracted.warnings];
     if (riskAlerts.length > 0) {
       warnings.push(
-        `Critical value detected in: ${riskAlerts.map((r) => r.title).join(", ")}.`
+        `Critical/Urgent alerts detected: ${riskAlerts.map((r) => r.title).join(", ")}.`
       );
     }
 

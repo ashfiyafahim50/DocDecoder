@@ -124,6 +124,48 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Add any verified radiology finding missing from the AI findings
+    for (const rad of radiologyFindings || []) {
+      const bodyPart = rad.bodyPart?.trim();
+      if (!bodyPart || bodyPart.toLowerCase() === "not specified") continue;
+
+      const alreadyExists = finalFindings.some(
+        (finding) =>
+          normalizeName(finding.parameterOrArea || "").includes(normalizeName(bodyPart))
+      );
+
+      if (!alreadyExists) {
+        finalFindings.push({
+          parameterOrArea: `${rad.bodyPart}${rad.studyType && rad.studyType !== "Not specified" ? ` (${rad.studyType})` : ""}`,
+          flagOrStatus:
+            rad.severity === "urgent"
+              ? "critical"
+              : rad.isAbnormal
+              ? "high"
+              : rad.isAbnormal === false
+              ? "normal"
+              : "unknown",
+          valueText: rad.impression || rad.observation,
+          simpleExplanation:
+            rad.observation ||
+            rad.impression ||
+            "Radiographic scan finding recorded for this area.",
+          clinicalSignificance: rad.impression,
+        });
+      }
+
+      if (rad.isAbnormal || rad.severity === "urgent") {
+        deterministicAlerts.push({
+          title: `Radiology Alert: ${rad.bodyPart}`,
+          severity: rad.severity === "urgent" ? "urgent" : "warning",
+          riskDetail:
+            rad.impression || rad.observation || "Abnormal radiographic finding observed.",
+          immediateAction:
+            "Consult an orthopedic doctor or emergency physician promptly for clinical examination and proper immobilization.",
+        });
+      }
+    }
+
     // Merge deterministic alerts with AI alerts.
     const finalRiskAlerts = mergeRiskAlerts(
       deterministicAlerts,

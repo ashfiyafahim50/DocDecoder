@@ -2,11 +2,9 @@
 
 import React, { useState } from "react";
 import { Header } from "@/components/Header";
-import { DemoBar } from "@/components/DemoBar";
 import { UploadZone } from "@/components/UploadZone";
 import { VerificationTable } from "@/components/VerificationTable";
 import { ResultsView } from "@/components/ResultsView";
-import { DemoSample } from "@/lib/demo-data";
 import { TestItem, MedicineItem, RadiologyFinding, ExplainResponse, DocType } from "@/lib/schema";
 import {
   AlertCircle,
@@ -34,7 +32,6 @@ type FlowStep = "1_UPLOAD" | "2_VERIFY" | "3_RESULTS";
 export default function Home() {
   const [currentStep, setCurrentStep] = useState<FlowStep>("1_UPLOAD");
   const [language, setLanguage] = useState("hinglish");
-  const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
 
   // Document state
   const [docType, setDocType] = useState<DocType>("lab_report");
@@ -62,7 +59,6 @@ export default function Home() {
     preview: string,
     _stats: { originalKb: number; compressedKb: number }
   ) => {
-    setActiveSampleId(null);
     setPreviewUrl(preview);
     setIsLoading(true);
     setErrorMessage(null);
@@ -105,39 +101,6 @@ export default function Home() {
   };
 
   /**
-   * 1-Click Golden Demo Sample selection
-   */
-  const handleSelectSample = (sample: DemoSample) => {
-    setActiveSampleId(sample.id);
-    setDocType(sample.docType);
-    setDocumentTitle(sample.title);
-    setTests(sample.tests);
-    setMedicines(sample.medicines);
-    setRadiologyFindings(sample.radiologyFindings || []);
-    setKeyObservations([]);
-    setWarnings([]);
-    setErrorMessage(null);
-
-    const cached = sample.cachedExplanation[language] || sample.cachedExplanation["hinglish"];
-    if (cached) {
-      setExplanation(cached);
-    } else {
-      setExplanation(null);
-    }
-
-    setCurrentStep("2_VERIFY");
-  };
-
-  const handleClearSample = () => {
-    setActiveSampleId(null);
-    setTests([]);
-    setMedicines([]);
-    setRadiologyFindings([]);
-    setExplanation(null);
-    setCurrentStep("1_UPLOAD");
-  };
-
-  /**
    * Step 2 -> Step 3: Run Pass 2 (Universal Explanation)
    */
   const handleConfirmVerification = async (
@@ -151,25 +114,6 @@ export default function Home() {
     setIsLoading(true);
     setErrorMessage(null);
     setLoadingMessage("Synthesizing plain explanation, medication timings & risks...");
-
-    // Fast-path for preset samples if cached
-    if (activeSampleId) {
-      const sample = (await import("@/lib/demo-data")).DEMO_SAMPLES.find(
-        (s) => s.id === activeSampleId
-      );
-      if (sample) {
-        const cached =
-          sample.cachedExplanation[language] || sample.cachedExplanation["hinglish"];
-        if (cached) {
-          setTimeout(() => {
-            setExplanation(cached);
-            setIsLoading(false);
-            setCurrentStep("3_RESULTS");
-          }, 500);
-          return;
-        }
-      }
-    }
 
     try {
       const res = await fetch("/api/explain", {
@@ -214,7 +158,6 @@ export default function Home() {
     setWarnings([]);
     setPreviewUrl(null);
     setExplanation(null);
-    setActiveSampleId(null);
     setErrorMessage(null);
   };
 
@@ -225,13 +168,6 @@ export default function Home() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg-page)" }}>
       {/* Primary Clinical Navigation Bar */}
       <Header language={language} onLanguageChange={setLanguage} />
-
-      {/* Instant Demo Presets Bar */}
-      <DemoBar
-        activeSampleId={activeSampleId}
-        onSelectSample={handleSelectSample}
-        onClearSample={handleClearSample}
-      />
 
       {/* Modern Stepper Progress Bar */}
       <div
