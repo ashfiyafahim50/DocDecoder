@@ -8,7 +8,26 @@ import { VerificationTable } from "@/components/VerificationTable";
 import { ResultsView } from "@/components/ResultsView";
 import { DemoSample } from "@/lib/demo-data";
 import { TestItem, MedicineItem, RadiologyFinding, ExplainResponse, DocType } from "@/lib/schema";
-import { AlertCircle } from "lucide-react";
+import {
+  AlertCircle,
+  FileText,
+  Pill,
+  Activity,
+  Scan,
+  ShieldCheck,
+  CheckCircle2,
+  Sparkles,
+  ArrowRight,
+  UploadCloud,
+  FileCheck2,
+  Lock,
+  Stethoscope,
+  HelpCircle,
+  Clock,
+  RotateCcw,
+  RefreshCw,
+  HeartPulse,
+} from "lucide-react";
 
 type FlowStep = "1_UPLOAD" | "2_VERIFY" | "3_RESULTS";
 
@@ -203,7 +222,7 @@ export default function Home() {
     tests.length > 0 || medicines.length > 0 || radiologyFindings.length > 0;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg-page)" }}>
       {/* Primary Clinical Navigation Bar */}
       <Header language={language} onLanguageChange={setLanguage} />
 
@@ -214,70 +233,173 @@ export default function Home() {
         onClearSample={handleClearSample}
       />
 
-      {/* Stepper Progress Bar */}
-      <div className="stepper-nav">
-        <div className="container" style={{ display: "flex", alignItems: "center" }}>
-          <button
-            onClick={() => setCurrentStep("1_UPLOAD")}
-            className={`step-item ${currentStep === "1_UPLOAD" ? "active" : "completed"}`}
-          >
-            <span className="step-num">1</span>
-            <span>Document Ingestion</span>
-          </button>
+      {/* Modern Stepper Progress Bar */}
+      <div
+        style={{
+          background: "var(--bg-card)",
+          borderBottom: "1px solid var(--border-subtle)",
+          padding: "12px 0",
+        }}
+      >
+        <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", flex: 1 }}>
+            {/* Step 1 */}
+            <button
+              onClick={() => setCurrentStep("1_UPLOAD")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 14px",
+                borderRadius: "9999px",
+                border: currentStep === "1_UPLOAD" ? "1.5px solid var(--brand-blue)" : "1px solid var(--border-subtle)",
+                background: currentStep === "1_UPLOAD" ? "var(--brand-light)" : "transparent",
+                color: currentStep === "1_UPLOAD" ? "var(--brand-blue)" : "var(--text-muted)",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  background: currentStep === "1_UPLOAD" ? "var(--brand-blue)" : "var(--bg-subtle)",
+                  color: currentStep === "1_UPLOAD" ? "#ffffff" : "var(--text-muted)",
+                  fontSize: "11px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                1
+              </span>
+              <span>1. Upload Document</span>
+            </button>
 
-          <div className="step-divider" />
+            <span style={{ color: "var(--text-light)", fontSize: "14px" }}>›</span>
 
-          <button
-            onClick={() => hasDataToVerify && setCurrentStep("2_VERIFY")}
-            disabled={!hasDataToVerify}
-            className={`step-item ${
-              currentStep === "2_VERIFY"
-                ? "active"
-                : currentStep === "3_RESULTS"
-                ? "completed"
-                : ""
-            }`}
-          >
-            <span className="step-num">2</span>
-            <span>Human Verification</span>
-          </button>
+            {/* Step 2 */}
+            <button
+              onClick={() => hasDataToVerify && setCurrentStep("2_VERIFY")}
+              disabled={!hasDataToVerify}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 14px",
+                borderRadius: "9999px",
+                border: currentStep === "2_VERIFY" ? "1.5px solid var(--brand-blue)" : "1px solid var(--border-subtle)",
+                background: currentStep === "2_VERIFY" ? "var(--brand-light)" : "transparent",
+                color: currentStep === "2_VERIFY" ? "var(--brand-blue)" : !hasDataToVerify ? "var(--text-light)" : "var(--text-muted)",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: hasDataToVerify ? "pointer" : "not-allowed",
+                opacity: hasDataToVerify ? 1 : 0.6,
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  background: currentStep === "2_VERIFY" ? "var(--brand-blue)" : "var(--bg-subtle)",
+                  color: currentStep === "2_VERIFY" ? "#ffffff" : "var(--text-muted)",
+                  fontSize: "11px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                2
+              </span>
+              <span>2. Review & Verify</span>
+            </button>
 
-          <div className="step-divider" />
+            <span style={{ color: "var(--text-light)", fontSize: "14px" }}>›</span>
 
-          <button
-            disabled={!explanation}
-            className={`step-item ${currentStep === "3_RESULTS" ? "active" : ""}`}
-          >
-            <span className="step-num">3</span>
-            <span>Decoded Explanation</span>
-          </button>
+            {/* Step 3 */}
+            <button
+              onClick={() => explanation && setCurrentStep("3_RESULTS")}
+              disabled={!explanation}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 14px",
+                borderRadius: "9999px",
+                border: currentStep === "3_RESULTS" ? "1.5px solid var(--brand-blue)" : "1px solid var(--border-subtle)",
+                background: currentStep === "3_RESULTS" ? "var(--brand-light)" : "transparent",
+                color: currentStep === "3_RESULTS" ? "var(--brand-blue)" : !explanation ? "var(--text-light)" : "var(--text-muted)",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: explanation ? "pointer" : "not-allowed",
+                opacity: explanation ? 1 : 0.6,
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  background: currentStep === "3_RESULTS" ? "var(--brand-blue)" : "var(--bg-subtle)",
+                  color: currentStep === "3_RESULTS" ? "#ffffff" : "var(--text-muted)",
+                  fontSize: "11px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                3
+              </span>
+              <span>3. Plain-Language Explanation</span>
+            </button>
+          </div>
+
+          {currentStep !== "1_UPLOAD" && (
+            <button
+              onClick={resetAll}
+              className="btn btn-secondary"
+              style={{ padding: "6px 12px", fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+            >
+              <RotateCcw size={13} />
+              <span>Start Over</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Main Content Area */}
-      <main className="container" style={{ flex: 1, padding: "32px 24px" }}>
+      <main className="container" style={{ flex: 1, padding: "36px 24px" }}>
         {/* Loading Progress Notification */}
         {isLoading && (
           <div
             style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-subtle)",
+              background: "linear-gradient(135deg, var(--bg-card) 0%, var(--brand-light) 100%)",
+              border: "1px solid var(--brand-blue)",
               borderRadius: "var(--radius-md)",
               padding: "20px 24px",
-              marginBottom: "24px",
+              marginBottom: "28px",
               display: "flex",
               alignItems: "center",
-              gap: "16px",
-              boxShadow: "var(--shadow-sm)",
+              gap: "18px",
+              boxShadow: "var(--shadow-md)",
             }}
           >
-            <div className="spinner" />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-main)" }}>
-                {loadingMessage}
+            <div className="spinner" style={{ width: "24px", height: "24px", borderWidth: "2.5px" }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>{loadingMessage}</span>
               </div>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                Multimodal AI reasoning in memory • Clinical safety guardrails active
+              <div style={{ fontSize: "12.5px", color: "var(--text-muted)", marginTop: "4px" }}>
+                Gemini Vision AI reasoning • Applying deterministic safety checks & reference ranges
               </div>
             </div>
           </div>
@@ -290,17 +412,21 @@ export default function Home() {
               background: "var(--status-danger-bg)",
               border: "1px solid var(--status-danger-border)",
               color: "var(--status-danger-text)",
-              borderRadius: "var(--radius-sm)",
-              padding: "14px 18px",
-              marginBottom: "24px",
+              borderRadius: "var(--radius-md)",
+              padding: "16px 20px",
+              marginBottom: "28px",
               display: "flex",
               alignItems: "center",
-              gap: "12px",
-              fontSize: "13.5px",
+              gap: "14px",
+              fontSize: "14px",
+              boxShadow: "var(--shadow-sm)",
             }}
           >
-            <AlertCircle size={18} style={{ flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>{errorMessage}</div>
+            <AlertCircle size={20} style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, lineHeight: 1.5 }}>
+              <strong>Notice: </strong>
+              {errorMessage}
+            </div>
             <button
               onClick={() => setErrorMessage(null)}
               style={{
@@ -309,7 +435,10 @@ export default function Home() {
                 color: "var(--status-danger-text)",
                 cursor: "pointer",
                 fontWeight: 700,
+                fontSize: "16px",
+                padding: "4px 8px",
               }}
+              title="Dismiss"
             >
               ✕
             </button>
@@ -319,85 +448,238 @@ export default function Home() {
         {/* Step 1: Upload */}
         {currentStep === "1_UPLOAD" && (
           <div>
-            <div style={{ textAlign: "center", maxWidth: "680px", margin: "0 auto 10px" }}>
-              <h2 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "8px" }}>
-                Make Any Doctor Report Understandable.
-              </h2>
-              <p style={{ fontSize: "15px", color: "var(--text-muted)" }}>
-                Upload a <strong>Doctor Prescription</strong>, <strong>Blood/Lab Report</strong>, or{" "}
-                <strong>X-Ray / Scan</strong>. Doc Decoder explains what is risky, how and when to
-                take every medicine, and questions to ask your doctor.
+            {/* Hero Header */}
+            <div style={{ textAlign: "center", maxWidth: "760px", margin: "0 auto 32px" }}>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "5px 14px",
+                  borderRadius: "9999px",
+                  background: "var(--brand-light)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--brand-blue)",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: "16px",
+                }}
+              >
+                <Sparkles size={14} />
+                <span>AI Clinical Report & Prescription Decoder</span>
+              </div>
+
+              <h1
+                style={{
+                  fontSize: "36px",
+                  fontWeight: 800,
+                  lineHeight: 1.25,
+                  letterSpacing: "-0.03em",
+                  marginBottom: "12px",
+                  color: "var(--text-main)",
+                }}
+              >
+                Make Any Medical Document{" "}
+                <span
+                  style={{
+                    background: "linear-gradient(135deg, var(--brand-blue) 0%, #06b6d4 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  Clear & Understandable
+                </span>
+              </h1>
+
+              <p
+                style={{
+                  fontSize: "16px",
+                  color: "var(--text-muted)",
+                  lineHeight: 1.6,
+                  maxWidth: "660px",
+                  margin: "0 auto 20px",
+                }}
+              >
+                Upload any <strong>Doctor Prescription</strong>, <strong>Lab Report</strong>, or{" "}
+                <strong>X-Ray / Scan</strong>. Doc Decoder explains medication schedules, flags dangerous
+                values, and prepares doctor questions in your language.
               </p>
+
+              {/* Trust Badges */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "20px",
+                  flexWrap: "wrap",
+                  fontSize: "12.5px",
+                  color: "var(--text-muted)",
+                  padding: "8px 0",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <ShieldCheck size={16} style={{ color: "#10b981" }} />
+                  <span>100% Stateless & Private</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <ZapIcon />
+                  <span>Multimodal Gemini Vision</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <HeartPulse size={16} style={{ color: "#ef4444" }} />
+                  <span>Deterministic Safety Flags</span>
+                </div>
+              </div>
             </div>
 
-            <UploadZone onImageProcessed={handleImageProcessed} isLoading={isLoading} />
+            {/* Upload Zone Card */}
+            <div style={{ maxWidth: "840px", margin: "0 auto" }}>
+              <UploadZone onImageProcessed={handleImageProcessed} isLoading={isLoading} />
+            </div>
 
+            {/* 4 Feature Highlights Grid */}
             <div
               style={{
-                maxWidth: "760px",
-                margin: "32px auto 0",
+                maxWidth: "880px",
+                margin: "40px auto 0",
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: "16px",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "18px",
               }}
             >
+              {/* Feature 1 */}
               <div
                 style={{
                   background: "var(--bg-card)",
                   border: "1px solid var(--border-subtle)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "16px",
+                  borderRadius: "var(--radius-md)",
+                  padding: "20px",
+                  boxShadow: "var(--shadow-sm)",
+                  transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               >
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--brand-blue)", textTransform: "uppercase" }}>
-                  Prescriptions
+                <div
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "8px",
+                    background: "rgba(59, 130, 246, 0.1)",
+                    color: "var(--brand-blue)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <Pill size={18} />
                 </div>
-                <div style={{ fontSize: "13.5px", fontWeight: 700, marginTop: "2px" }}>
-                  Every Tablet Explained
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-main)", marginBottom: "6px" }}>
+                  Medicine Timings
                 </div>
-                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-                  Tells you exactly <strong>How</strong> (with water, empty stomach) and{" "}
-                  <strong>When</strong> (morning/night, before/after meals) to take each medicine.
+                <div style={{ fontSize: "12.5px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  Decodes exact timings: morning, afternoon, night, before/after meals, and cautions.
                 </div>
               </div>
 
+              {/* Feature 2 */}
               <div
                 style={{
                   background: "var(--bg-card)",
                   border: "1px solid var(--border-subtle)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "16px",
+                  borderRadius: "var(--radius-md)",
+                  padding: "20px",
+                  boxShadow: "var(--shadow-sm)",
                 }}
               >
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--brand-blue)", textTransform: "uppercase" }}>
-                  Lab & X-Ray Reports
+                <div
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "8px",
+                    background: "rgba(239, 68, 68, 0.1)",
+                    color: "#ef4444",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <Activity size={18} />
                 </div>
-                <div style={{ fontSize: "13.5px", fontWeight: 700, marginTop: "2px" }}>
-                  Clear Risks & Red Flags
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-main)", marginBottom: "6px" }}>
+                  Lab Danger Flags
                 </div>
-                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-                  Flags danger values or scan abnormalities immediately so you know what is risky
-                  and what requires urgent doctor care.
+                <div style={{ fontSize: "12.5px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  Compares values against reference ranges and highlights out-of-range critical risks.
                 </div>
               </div>
 
+              {/* Feature 3 */}
               <div
                 style={{
                   background: "var(--bg-card)",
                   border: "1px solid var(--border-subtle)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "16px",
+                  borderRadius: "var(--radius-md)",
+                  padding: "20px",
+                  boxShadow: "var(--shadow-sm)",
                 }}
               >
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--brand-blue)", textTransform: "uppercase" }}>
+                <div
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "8px",
+                    background: "rgba(139, 92, 246, 0.1)",
+                    color: "#8b5cf6",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <Scan size={18} />
+                </div>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-main)", marginBottom: "6px" }}>
+                  Scans & Imaging
+                </div>
+                <div style={{ fontSize: "12.5px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  Translates X-Ray, CT scan, and MRI medical jargon into simple, plain human language.
+                </div>
+              </div>
+
+              {/* Feature 4 */}
+              <div
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "20px",
+                  boxShadow: "var(--shadow-sm)",
+                }}
+              >
+                <div
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "8px",
+                    background: "rgba(16, 185, 129, 0.1)",
+                    color: "#10b981",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <HelpCircle size={18} />
+                </div>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-main)", marginBottom: "6px" }}>
                   Doctor Checklist
                 </div>
-                <div style={{ fontSize: "13.5px", fontWeight: 700, marginTop: "2px" }}>
-                  Questions in Your Language
-                </div>
-                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-                  Generates ready-to-ask questions in Hinglish, Hindi, or English to empower your
-                  doctor consultation.
+                <div style={{ fontSize: "12.5px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  Generates ready-to-ask questions in Hinglish, Hindi, or English for your next doctor visit.
                 </div>
               </div>
             </div>
@@ -433,9 +715,9 @@ export default function Home() {
         style={{
           borderTop: "1px solid var(--border-subtle)",
           background: "var(--bg-card)",
-          padding: "20px 0",
-          fontSize: "12px",
-          color: "var(--text-light)",
+          padding: "24px 0",
+          fontSize: "12.5px",
+          color: "var(--text-muted)",
         }}
       >
         <div
@@ -445,17 +727,34 @@ export default function Home() {
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: "12px",
+            gap: "16px",
           }}
         >
-          <div>Doc Decoder • Universal Clinical Report & Prescription Translator</div>
-          <div style={{ display: "flex", gap: "16px" }}>
-            <span>Stateless Monolith</span>
-            <span>Zero Data Storage</span>
-            <span>Powered by Gemini Multimodal Vision</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Stethoscope size={16} style={{ color: "var(--brand-blue)" }} />
+            <span style={{ fontWeight: 600, color: "var(--text-main)" }}>Doc Decoder</span>
+            <span>• Human-in-the-Loop Clinical Translator</span>
+          </div>
+          <div style={{ display: "flex", gap: "20px", fontSize: "12px" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <Lock size={13} style={{ color: "#10b981" }} />
+              Zero Data Storage
+            </span>
+            <span>•</span>
+            <span>Multimodal Vision</span>
+            <span>•</span>
+            <span>Educational Use Only</span>
           </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+function ZapIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
   );
 }

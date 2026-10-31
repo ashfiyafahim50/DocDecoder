@@ -75,6 +75,18 @@ function parseNumber(value: unknown): number | null {
 }
 
 /**
+ * Normalize model identifier to prevent crashes from invalid or legacy names.
+ */
+function normalizeModelName(modelName?: string): string {
+  if (!modelName) return "gemini-2.5-flash";
+  const trimmed = modelName.trim().toLowerCase();
+  if (trimmed.includes("3.8") || trimmed === "gemini-flash" || !trimmed.startsWith("gemini-")) {
+    return "gemini-2.5-flash";
+  }
+  return trimmed;
+}
+
+/**
  * Initialize Gemini client.
  */
 export function getGeminiClient(): {
@@ -89,8 +101,7 @@ export function getGeminiClient(): {
     );
   }
 
-  const primaryModel =
-    process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const primaryModel = normalizeModelName(process.env.GEMINI_MODEL);
 
   const client = new GoogleGenerativeAI(apiKey);
 
@@ -98,13 +109,38 @@ export function getGeminiClient(): {
 }
 
 /**
- * Fallback models.
- * Keep only model IDs that you have verified are available
- * for your Gemini API account.
+ * Comprehensive fallback models in priority order.
+ * Ensures resiliency against regional outages, 503 capacity spikes, and quota throttles.
  */
 const FALLBACK_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
+  "gemini-2.0-flash-lite",
   "gemini-flash-latest",
+  "gemini-1.5-pro",
 ];
+
+/**
+ * Check whether an error is transient and can benefit from a retry on the same model.
+ */
+function isTransientError(message: string): boolean {
+  const errMsg = message.toLowerCase();
+  return (
+    errMsg.includes("503") ||
+    errMsg.includes("high demand") ||
+    errMsg.includes("unavailable") ||
+    errMsg.includes("429") ||
+    errMsg.includes("quota") ||
+    errMsg.includes("resource has been exhausted") ||
+    errMsg.includes("rate limit") ||
+    errMsg.includes("overloaded") ||
+    errMsg.includes("econnreset") ||
+    errMsg.includes("etimedout") ||
+    errMsg.includes("fetch failed")
+  );
+}
 
 /**
  * Check whether an error should trigger model fallback.
@@ -113,24 +149,21 @@ function shouldFallbackOnError(message: string): boolean {
   const errMsg = message.toLowerCase();
 
   return (
+    isTransientError(errMsg) ||
     errMsg.includes("500") ||
     errMsg.includes("internal error") ||
-    errMsg.includes("503") ||
-    errMsg.includes("high demand") ||
-    errMsg.includes("unavailable") ||
-    errMsg.includes("429") ||
-    errMsg.includes("quota") ||
-    errMsg.includes("resource has been exhausted") ||
     errMsg.includes("not found") ||
     errMsg.includes("404") ||
     errMsg.includes("empty response") ||
-    errMsg.includes("overloaded") ||
-    errMsg.includes("temporarily")
+    errMsg.includes("temporarily") ||
+    errMsg.includes("network") ||
+    errMsg.includes("timeout") ||
+    errMsg.includes("enotfound")
   );
 }
 
 /**
- * Generate response with model fallback.
+ * Generate response with model fallback and automatic retry on transient capacity spikes (503 / 429).
  */
 async function generateWithModelFallback(
   client: GoogleGenerativeAI,
@@ -138,79 +171,102 @@ async function generateWithModelFallback(
   generationConfig: any,
   preferredModel: string
 ): Promise<{ text: string; modelUsed: string }> {
+  const normalizedPreferred = normalizeModelName(preferredModel);
   const modelsToTry = [
     ...new Set([
-      preferredModel,
+      normalizedPreferred,
       ...FALLBACK_MODELS.filter(
-        (model) => model !== preferredModel
+        (model) => model !== normalizedPreferred
       ),
     ]),
   ];
 
   let lastError: unknown = null;
+  const MAX_RETRIES_PER_MODEL = 2; // Initial try + 1 retry for transient spikes
 
   for (const modelName of modelsToTry) {
-    try {
-      console.log(
-        `[DocDecoder AI] Requesting inference from: ${modelName}...`
-      );
-
-      const model = client.getGenerativeModel({
-        model: modelName,
-        generationConfig,
-      });
-
-      const result = await model.generateContent(parts);
-      const responseText = result.response.text();
-
-      if (responseText && responseText.trim().length > 0) {
+    for (let attempt = 0; attempt < MAX_RETRIES_PER_MODEL; attempt++) {
+      try {
         console.log(
-          `[DocDecoder AI] Successful response from: ${modelName}`
+          `[DocDecoder AI] Requesting inference from: ${modelName} (attempt ${attempt + 1}/${MAX_RETRIES_PER_MODEL})...`
         );
 
-        return {
-          text: responseText,
-          modelUsed: modelName,
-        };
+        const model = client.getGenerativeModel(
+          {
+            model: modelName,
+            generationConfig,
+          },
+          {
+            timeout: 45000,
+          }
+        );
+
+        const startTime = Date.now();
+
+        const result = await model.generateContent(parts);
+        const responseText = result.response.text();
+
+        const elapsedTime = (
+          (Date.now() - startTime) / 1000
+        ).toFixed(2);
+
+        if (responseText && responseText.trim().length > 0) {
+          console.log(
+            `[DocDecoder AI] Successful response from ${modelName} in ${elapsedTime}s`
+          );
+
+          return {
+            text: responseText,
+            modelUsed: modelName,
+          };
+        }
+
+        throw new Error(`Empty response from ${modelName}`);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : String(err);
+
+        console.warn(
+          `[DocDecoder AI] Model ${modelName} attempt ${attempt + 1} failed: ${message}`
+        );
+
+        lastError = err;
+
+        // If the model ID was not found (404), do not retry; fall back to next model immediately.
+        if (message.includes("404") || message.includes("not found")) {
+          break;
+        }
+
+        // If it's a transient spike (503 Service Unavailable / 429 Rate Limit) and we have retries left, wait and retry.
+        if (isTransientError(message) && attempt < MAX_RETRIES_PER_MODEL - 1) {
+          const delay = (attempt + 1) * 1500;
+          console.log(
+            `[DocDecoder AI] Transient capacity spike (503/429). Retrying ${modelName} in ${delay}ms...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // If error is eligible for fallback to another model, break attempt loop to proceed to next model.
+        if (shouldFallbackOnError(message)) {
+          break;
+        }
+
+        // Fatal/unrecoverable error (e.g. invalid arguments or non-transient error)
+        throw err;
       }
-
-      lastError = new Error(
-        `Empty response from ${modelName}`
-      );
-
-      console.warn(
-        `[DocDecoder AI] Empty response from ${modelName}. Trying next model...`
-      );
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : String(err);
-
-      console.warn(
-        `[DocDecoder AI] Model ${modelName} returned error: ${message}`
-      );
-
-      lastError = err;
-
-      if (shouldFallbackOnError(message)) {
-        console.log(
-          `[DocDecoder AI] Temporary/model error. Trying next fallback model...`
-        );
-
-        await new Promise((resolve) =>
-          setTimeout(resolve, 1000)
-        );
-
-        continue;
-      }
-
-      throw err;
     }
+
+    // Small delay before trying the next fallback model.
+    await new Promise((resolve) =>
+      setTimeout(resolve, 800)
+    );
   }
 
   throw (
     lastError ||
     new Error(
-      "All AI models are temporarily unavailable. Please retry."
+      "All AI models are temporarily unavailable. Please retry in a few moments."
     )
   );
 }
@@ -446,11 +502,20 @@ export async function extractFromImage(
       err
     );
 
+    const rawMessage = err instanceof Error ? err.message : String(err);
+    let friendlyMessage = rawMessage;
+
+    if (
+      rawMessage.includes("503") ||
+      rawMessage.includes("high demand") ||
+      rawMessage.includes("unavailable")
+    ) {
+      friendlyMessage =
+        "The AI model is experiencing a temporary demand surge on Google's servers. Please retry in a few moments.";
+    }
+
     throw new Error(
-      `Failed to process document: ${err instanceof Error
-        ? err.message
-        : "Invalid JSON or unreadable image"
-      }`
+      `Failed to process document: ${friendlyMessage}`
     );
   }
 }
