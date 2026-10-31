@@ -1,5 +1,13 @@
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import dns from "dns";
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+
+// Ensure Node.js prioritizes IPv4 to prevent ENETUNREACH socket drops on networks without IPv6 routes
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {
+  // Ignore in environments where setDefaultResultOrder is unavailable
+}
 import {
   UNIVERSAL_EXTRACTION_PROMPT,
   buildUniversalExplanationPrompt,
@@ -109,17 +117,33 @@ export function getGeminiClient(): {
 }
 
 /**
- * Comprehensive fallback models in priority order.
- * Ensures resiliency against regional outages, 503 capacity spikes, and quota throttles.
+ * Clinical safety settings for medical documents & radiology imaging.
+ * Prevents false-positive blocks on anatomical X-rays, pathology images, and lab reports.
+ */
+const CLINICAL_SAFETY_SETTINGS = [
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+];
+
+/**
+ * Active verified fallback models in priority order.
  */
 const FALLBACK_MODELS = [
   "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-  "gemini-2.0-flash-lite",
-  "gemini-flash-latest",
-  "gemini-1.5-pro",
 ];
 
 /**
@@ -182,6 +206,7 @@ async function generateWithModelFallback(
   ];
 
   let lastError: unknown = null;
+  let primaryError: unknown = null;
   const MAX_RETRIES_PER_MODEL = 2; // Initial try + 1 retry for transient spikes
 
   for (const modelName of modelsToTry) {
@@ -195,6 +220,7 @@ async function generateWithModelFallback(
           {
             model: modelName,
             generationConfig,
+            safetySettings: CLINICAL_SAFETY_SETTINGS,
           },
           {
             timeout: 45000,
@@ -231,6 +257,9 @@ async function generateWithModelFallback(
         );
 
         lastError = err;
+        if (modelName === modelsToTry[0] && !primaryError) {
+          primaryError = err;
+        }
 
         // If the model ID was not found (404), do not retry; fall back to next model immediately.
         if (message.includes("404") || message.includes("not found")) {
@@ -264,6 +293,7 @@ async function generateWithModelFallback(
   }
 
   throw (
+    primaryError ||
     lastError ||
     new Error(
       "All AI models are temporarily unavailable. Please retry in a few moments."

@@ -31,7 +31,7 @@ export function UploadZone({ onImageProcessed, isLoading }: UploadZoneProps) {
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        const MAX_DIM = 1600;
+        const MAX_DIM = 1400;
         let width = img.width;
         let height = img.height;
 
@@ -61,8 +61,8 @@ export function UploadZone({ onImageProcessed, isLoading }: UploadZoneProps) {
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convert to high-quality JPEG
-        const base64Jpeg = canvas.toDataURL("image/jpeg", 0.88);
+        // Convert to high-quality JPEG (balanced for crisp clinical detail & reliable upload)
+        const base64Jpeg = canvas.toDataURL("image/jpeg", 0.82);
         const compressedKb = Math.round((base64Jpeg.length * 3) / 4 / 1024);
 
         onImageProcessed(base64Jpeg, base64Jpeg, {

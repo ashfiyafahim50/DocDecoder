@@ -43,7 +43,9 @@ function normalizeUnit(unit: string): string {
     .toLowerCase()
     .replace(/[μµ]/g, "u")
     .replace(/\s+/g, "")
-    .replace(/³/g, "3");
+    .replace(/³/g, "3")
+    .replace(/mil-lion/g, "million")
+    .replace(/mill/g, "million");
 }
 
 function areUnitsCompatible(actual: string, expected: string): boolean {
@@ -53,13 +55,62 @@ function areUnitsCompatible(actual: string, expected: string): boolean {
   if (!actualUnit || !expectedUnit) return false;
   if (actualUnit === expectedUnit) return true;
 
-  // Equivalent count-per-volume formats.
-  const countUnits = ["/ul", "/cmm", "/mm3", "cells/ul", "cell/ul"];
+  // Equivalent count-per-volume formats (WBC, Platelets, Absolute DLC)
+  const countUnits = [
+    "/ul",
+    "ul",
+    "/cumm",
+    "cumm",
+    "/cmm",
+    "cmm",
+    "/mm3",
+    "mm3",
+    "cells/ul",
+    "cell/ul",
+    "cells/cumm",
+    "cell/cumm",
+  ];
 
-  if (
-    countUnits.includes(actualUnit) &&
-    countUnits.includes(expectedUnit)
-  ) {
+  if (countUnits.includes(actualUnit) && countUnits.includes(expectedUnit)) {
+    return true;
+  }
+
+  // Equivalent million per volume formats (for RBC)
+  const millionUnits = [
+    "million/ul",
+    "million/cumm",
+    "million/cmm",
+    "million/mm3",
+    "mil/cumm",
+    "mil/ul",
+    "10^6/ul",
+    "10^6/cumm",
+  ];
+  if (millionUnits.includes(actualUnit) && millionUnits.includes(expectedUnit)) {
+    return true;
+  }
+
+  // Grams per deciliter (Hemoglobin, MCHC)
+  const gdlUnits = ["g/dl", "gm/dl", "g/100ml", "gm/100ml"];
+  if (gdlUnits.includes(actualUnit) && gdlUnits.includes(expectedUnit)) {
+    return true;
+  }
+
+  // Femtoliters (MCV, MPV, RDW-SD)
+  const flUnits = ["fl", "femtoliter", "femtoliters"];
+  if (flUnits.includes(actualUnit) && flUnits.includes(expectedUnit)) {
+    return true;
+  }
+
+  // Picograms (MCH)
+  const pgUnits = ["pg", "picogram", "picograms"];
+  if (pgUnits.includes(actualUnit) && pgUnits.includes(expectedUnit)) {
+    return true;
+  }
+
+  // Percentage (DLC differentials, Hct/PCV, RDW-CV)
+  const pctUnits = ["%", "percent", "percentage"];
+  if (pctUnits.includes(actualUnit) && pctUnits.includes(expectedUnit)) {
     return true;
   }
 
@@ -104,99 +155,112 @@ export function evaluateTestFlag(test: TestItem): {
 } {
   const norm = normalizeTestName(test.name);
   const canonicalName = norm ? norm.canonicalName : test.name;
-
   const originalUnit = test.unit?.trim() || null;
-
-  // Unknown or ambiguous test names cannot be evaluated safely.
-  if (!norm) {
-    return {
-      flag: "unknown",
-      refLow: test.refLow ?? null,
-      refHigh: test.refHigh ?? null,
-      unit: originalUnit,
-      canonicalName: test.name,
-      isCritical: false,
-    };
-  }
-
-  // Never compare values when the unit is missing or incompatible.
-  if (!originalUnit || !areUnitsCompatible(originalUnit, norm.unit)) {
-    return {
-      flag: "unknown",
-      refLow: test.refLow ?? null,
-      refHigh: test.refHigh ?? null,
-      unit: originalUnit,
-      canonicalName,
-      isCritical: false,
-    };
-  }
-
-  const refLow = test.refLow ?? norm.defaultLow;
-  const refHigh = test.refHigh ?? norm.defaultHigh;
   const val = test.value;
 
-  if (val === null || !Number.isFinite(val)) {
-    return {
-      flag: "unknown",
-      refLow,
-      refHigh,
-      unit: originalUnit,
-      canonicalName,
-      isCritical: false,
-    };
+  // 1. If standard test exists in dictionary and units match, evaluate standard ranges + critical limits
+  if (norm && (!originalUnit || areUnitsCompatible(originalUnit, norm.unit))) {
+    const refLow = test.refLow ?? norm.defaultLow;
+    const refHigh = test.refHigh ?? norm.defaultHigh;
+
+    if (val === null || !Number.isFinite(val)) {
+      return {
+        flag: "unknown",
+        refLow,
+        refHigh,
+        unit: originalUnit || norm.unit,
+        canonicalName,
+        isCritical: false,
+      };
+    }
+
+    if (norm.criticalLow !== null && val <= norm.criticalLow) {
+      return {
+        flag: "critical",
+        refLow,
+        refHigh,
+        unit: originalUnit || norm.unit,
+        canonicalName,
+        isCritical: true,
+        criticalReason: `${canonicalName} value (${val} ${originalUnit || norm.unit}) is below the configured critical threshold (${norm.criticalLow} ${norm.unit}). This requires clinical review.`,
+      };
+    }
+
+    if (norm.criticalHigh !== null && val >= norm.criticalHigh) {
+      return {
+        flag: "critical",
+        refLow,
+        refHigh,
+        unit: originalUnit || norm.unit,
+        canonicalName,
+        isCritical: true,
+        criticalReason: `${canonicalName} value (${val} ${originalUnit || norm.unit}) is above the configured critical threshold (${norm.criticalHigh} ${norm.unit}). This requires clinical review.`,
+      };
+    }
+
+    if (refLow !== null && val < refLow) {
+      return {
+        flag: "low",
+        refLow,
+        refHigh,
+        unit: originalUnit || norm.unit,
+        canonicalName,
+        isCritical: false,
+      };
+    }
+
+    if (refHigh !== null && val > refHigh) {
+      return {
+        flag: "high",
+        refLow,
+        refHigh,
+        unit: originalUnit || norm.unit,
+        canonicalName,
+        isCritical: false,
+      };
+    }
+
+    if (refLow !== null || refHigh !== null) {
+      return {
+        flag: "normal",
+        refLow,
+        refHigh,
+        unit: originalUnit || norm.unit,
+        canonicalName,
+        isCritical: false,
+      };
+    }
   }
 
-  if (norm.criticalLow !== null && val <= norm.criticalLow) {
-    return {
-      flag: "critical",
-      refLow,
-      refHigh,
-      unit: originalUnit,
-      canonicalName,
-      isCritical: true,
-      criticalReason: `${canonicalName} value (${val} ${originalUnit}) is below the configured critical threshold (${norm.criticalLow} ${norm.unit}). This requires verification against the original report and clinical review.`,
-    };
-  }
+  // 2. Fallback to printed report reference ranges if available on the document
+  const reportRefLow = test.refLow ?? null;
+  const reportRefHigh = test.refHigh ?? null;
 
-  if (norm.criticalHigh !== null && val >= norm.criticalHigh) {
-    return {
-      flag: "critical",
-      refLow,
-      refHigh,
-      unit: originalUnit,
-      canonicalName,
-      isCritical: true,
-      criticalReason: `${canonicalName} value (${val} ${originalUnit}) is above the configured critical threshold (${norm.criticalHigh} ${norm.unit}). This requires verification against the original report and clinical review.`,
-    };
-  }
-
-  if (refLow !== null && val < refLow) {
-    return {
-      flag: "low",
-      refLow,
-      refHigh,
-      unit: originalUnit,
-      canonicalName,
-      isCritical: false,
-    };
-  }
-
-  if (refHigh !== null && val > refHigh) {
-    return {
-      flag: "high",
-      refLow,
-      refHigh,
-      unit: originalUnit,
-      canonicalName,
-      isCritical: false,
-    };
-  }
-
-  if (refLow !== null || refHigh !== null) {
+  if (val !== null && Number.isFinite(val) && (reportRefLow !== null || reportRefHigh !== null)) {
+    if (reportRefLow !== null && val < reportRefLow) {
+      return {
+        flag: "low",
+        refLow: reportRefLow,
+        refHigh: reportRefHigh,
+        unit: originalUnit,
+        canonicalName,
+        isCritical: false,
+      };
+    }
+    if (reportRefHigh !== null && val > reportRefHigh) {
+      return {
+        flag: "high",
+        refLow: reportRefLow,
+        refHigh: reportRefHigh,
+        unit: originalUnit,
+        canonicalName,
+        isCritical: false,
+      };
+    }
     return {
       flag: "normal",
-      refLow,
-      refHigh,
+      refLow: reportRefLow,
+      refHigh: reportRefHigh,
       unit: originalUnit,
       canonicalName,
       isCritical: false,
@@ -204,9 +268,9 @@ export function evaluateTestFlag(test: TestItem): {
   }
 
   return {
-    flag: "unknown",
-    refLow,
-    refHigh,
+    flag: test.flag && test.flag !== "unknown" ? test.flag : "unknown",
+    refLow: reportRefLow,
+    refHigh: reportRefHigh,
     unit: originalUnit,
     canonicalName,
     isCritical: false,
